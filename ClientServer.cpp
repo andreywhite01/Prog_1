@@ -54,10 +54,10 @@ int ClientServer::tryInitializeSocket() {
 
 //Реализация методов класса, унаследованного от базового ClientPart
 
-int ClientPart::connectServer(const char* ip, unsigned short port) {
+int ClientPart::connectToServer(const char* ip, unsigned short port) {
     setServInfo(ip, port);
     int err = tryConnectToServer();
-    return err;
+	return err;
 }
 void ClientPart::post(const vector <char>& buf) {
     short packet_size = send(Sock, buf.data(), (int)buf.size(), 0);

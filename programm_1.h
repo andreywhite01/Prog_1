@@ -5,15 +5,13 @@
 #include <thread>
 #include <mutex>
 #include <fstream>
-#include <iostream>
 #include <WinSock2.h>
 #include <WS2tcpip.h>
 #include <vector>
 #include <sstream>
 #include "ClientServer.h"
 #include <condition_variable>
-
-#pragma comment(lib, "Ws2_32.lib")
+#include <cstdio>
 
 #define BUFF_SIZE 5
 #define MAX_INPUT_SIZE 64
@@ -26,11 +24,12 @@ class Buffer {
 private:
     ofstream inBuffer;
     ifstream fromBuffer;
-    const string fileName = "buffer.txt";
+    const char* fileName = "buffer.txt";
 public:
     bool isReady = false;
     mutable mutex mtx;
     condition_variable fileReadyCondition;
+    void deleteBuffer();
 
     void writeInBuffer(string text, size_t inputLength);
     string readFromBuffer();

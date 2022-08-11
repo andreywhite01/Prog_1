@@ -3,7 +3,7 @@
 int main()
 {
     ClientPart server;
-    int err = server.connectServer("127.0.0.1", 8080);
+    int err = server.connectToServer("127.0.0.1", 8080);
 
     if (err != 0)
         return 1;
@@ -55,6 +55,9 @@ string Buffer::readFromBuffer() {
     inBuffer.close();
 
     return inputText;
+}
+void Buffer::deleteBuffer() {
+    remove(fileName);
 }
 
 // Точка входа потока №2

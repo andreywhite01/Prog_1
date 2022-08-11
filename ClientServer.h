@@ -36,13 +36,13 @@ protected:
 class ClientPart :public ClientServer {
 public:
     ClientPart() : ClientServer() {};
-    int connectServer(const char* ip, unsigned short port);
+    int connectToServer(const char* ip, unsigned short port);
     void post(const vector<char>& buf);
 private:
     int tryConnectToServer();
 };
 
-class ServerPart : public ClientServer {
+class ServerPart :public ClientServer {
 public:
     ServerPart() : ClientServer() {};
     SOCKET getServSock();
