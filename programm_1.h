@@ -11,6 +11,7 @@
 #include <vector>
 #include <sstream>
 #include "ClientServer.h"
+#include <condition_variable>
 
 #pragma comment(lib, "Ws2_32.lib")
 
@@ -25,10 +26,12 @@ class Buffer {
 private:
     ofstream inBuffer;
     ifstream fromBuffer;
-    mutable mutex fileLocker;
     const string fileName = "buffer.txt";
 public:
     bool isReady = false;
+    mutable mutex mtx;
+    condition_variable fileReadyCondition;
+
     void writeInBuffer(const string& text, size_t inputLength);
     string readFromBuffer();
 };

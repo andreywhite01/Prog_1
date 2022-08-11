@@ -24,19 +24,22 @@ int main()
 
 void Buffer::writeInBuffer(const string& text, size_t inputLength) {
 
-    lock_guard<mutex> lock(fileLocker); // До конца выполнения функции доступ к переменной isReady имеет только первый поток
+    //lock_guard<mutex> lock(mtx); // До конца выполнения функции доступ к переменной isReady имеет только первый поток
+    unique_lock<mutex> lock(mtx);
 
     inBuffer.open(fileName, std::ios::out);
     for (unsigned i = 0; i < inputLength; ++i) {
         inBuffer << text[i];
     }
     inBuffer.close();
+
     isReady = true;
+    fileReadyCondition.notify_all();
 }
 string Buffer::readFromBuffer() {
     string inputText = "";
 
-    lock_guard<mutex> lock(fileLocker); // До конца выполнения функции доступ к переменной isReady имеет только второй поток
+    //lock_guard<mutex> lock(mtx); // До конца выполнения функции доступ к переменной isReady имеет только второй поток
 
     fromBuffer.open(fileName, std::ios::in);
     fromBuffer >> inputText;
@@ -49,42 +52,47 @@ string Buffer::readFromBuffer() {
     return inputText;
 }
 
-// Точка вохода потока №2
+// Точка входа потока №2
 void postSumOfIntegersFromStr(Buffer& buffer, ClientPart& server) {
     while (true) {
-        if (buffer.isReady) {
-            string strLine = buffer.readFromBuffer();
+        cout << "Thread 2" << endl;
+        unique_lock<mutex> lock(buffer.mtx);
+        if (!buffer.isReady)
+            buffer.fileReadyCondition.wait(lock);
 
-            if (strLine == "exit") {
-                buffer.writeInBuffer("", 0);
-                break;
-            }
 
-            string::iterator it = strLine.begin();
 
-            int sum = isIntegerInChar(*it) ? C_INT(*it) : 0;
+        string strLine = buffer.readFromBuffer();
 
-            while (++it != strLine.end()) {
-                if (isIntegerInChar(*it))
-                    sum += C_INT(*it);
-            }
-            cout << "Transformed array: " << strLine << endl;
-
-            stringstream ss;
-            ss << to_string(sum);
-            vector <char> buf(BUFF_SIZE);
-            ss.read(buf.data(), buf.size());
-
-            server.post(buf);
+        if (strLine == "exit") {
+            buffer.writeInBuffer("", 0);
+            break;
         }
+
+        string::iterator it = strLine.begin();
+
+        int sum = isIntegerInChar(*it) ? C_INT(*it) : 0;
+
+        while (++it != strLine.end()) {
+            if (isIntegerInChar(*it))
+                sum += C_INT(*it);
+        }
+        cout << "Transformed array: " << strLine << endl;
+
+        stringstream ss;
+        ss << to_string(sum);
+        vector <char> buf(BUFF_SIZE);
+        ss.read(buf.data(), buf.size());
+
+        server.post(buf);
     }
 }
 
-// Точка вохода потока №1
+// Точка входа потока №1
 void readAndPrecessInput(Buffer& buffer, istream& in) {
 
     while (true) {
-
+        cout << "Thread 1" << endl;
         char arrayOfInputSymbols[MAX_INPUT_SIZE + 1];
         size_t inputLength = readInputAndGetAmount(in, arrayOfInputSymbols);
 
