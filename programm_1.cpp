@@ -3,7 +3,10 @@
 int main()
 {
     ClientPart server;
-    server.Connect("127.0.0.1", 8080);
+    int err = server.connectServer("127.0.0.1", 8080);
+
+    if (err != 0)
+        return 1;
 
     Buffer accessingFile;
 
@@ -81,6 +84,7 @@ void postSumOfIntegersFromStr(Buffer& buffer, ClientPart& server) {
 void readAndPrecessInput(Buffer& buffer, istream& in) {
 
     while (true) {
+
         char arrayOfInputSymbols[MAX_INPUT_SIZE + 1];
         size_t inputLength = readInputAndGetAmount(in, arrayOfInputSymbols);
 
