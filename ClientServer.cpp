@@ -5,6 +5,10 @@ ClientServer::ClientServer() {
     tryWSAStartup();
     tryInitializeSocket();
 }
+ClientServer::~ClientServer() {
+    closesocket(Sock);
+    WSACleanup();
+}
 int ClientServer::tryWSAStartup() {
     err = WSAStartup(MAKEWORD(2, 2), &wsaData);
 
@@ -50,13 +54,9 @@ int ClientServer::tryInitializeSocket() {
 
 //Реализация методов класса, унаследованного от базового ClientPart
 
-void ClientPart::Connect(const char* ip, unsigned short port) {
+void ClientPart::connectToServer(const char* ip, unsigned short port) {
     setServInfo(ip, port);
     tryConnectToServer();
-}
-ClientPart::~ClientPart() {
-    closesocket(Sock);
-    WSACleanup();
 }
 void ClientPart::post(const vector <char>& buf) {
     short packet_size = send(Sock, buf.data(), (int)buf.size(), 0);
@@ -78,11 +78,29 @@ int ClientPart::tryConnectToServer() {
 
 //Реализация методов класса, унаследованного от базового Server
 
-void ServerPart::CreateConnection(const char* ip, unsigned short port) {
+void ServerPart::createServer(const char* ip, unsigned short port) {
     setServInfo(ip, port);
     tryServerBinding();
+}
+void ServerPart::createConnection() {
     tryListening();
-    ConnectToClient();
+    connectToClient();
+}
+int ServerPart::reconnect() {
+    sockaddr_in clientInfo;
+    ZeroMemory(&clientInfo, sizeof(clientInfo));
+    int clientInfo_size = sizeof(clientInfo);
+    ClientConn = accept(Sock, (sockaddr*)&clientInfo, &clientInfo_size);
+    if (ClientConn == INVALID_SOCKET) {
+        cerr << "Client detected, but can't connect to a client. Error # " << WSAGetLastError() << endl;
+        closesocket(Sock);
+        closesocket(ClientConn);
+        WSACleanup();
+        return 1;
+    }
+    else
+        cerr << "Reconncetion to a client established successfully" << endl;
+    return 0;
 }
 SOCKET ServerPart::getServSock() {
     return Sock;
@@ -119,7 +137,7 @@ int ServerPart::tryListening() {
     }
     return 0;
 }
-int ServerPart::ConnectToClient() {
+int ServerPart::connectToClient() {
     sockaddr_in clientInfo;
 
     ZeroMemory(&clientInfo, sizeof(clientInfo));

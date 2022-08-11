@@ -20,6 +20,7 @@ using namespace std;
 class ClientServer {
 public:
     ClientServer();
+    ~ClientServer();
 protected:
     int err = 0;
     WSADATA wsaData;
@@ -35,23 +36,24 @@ protected:
 class ClientPart :public ClientServer {
 public:
     ClientPart() : ClientServer() {};
-    ~ClientPart();
-    void Connect(const char* ip, unsigned short port);
+    void connectToServer(const char* ip, unsigned short port);
     void post(const vector<char>& buf);
 private:
     int tryConnectToServer();
 };
 
-class ServerPart :ClientServer {
+class ServerPart :public ClientServer {
 public:
     ServerPart() : ClientServer() {};
     SOCKET getServSock();
     SOCKET getClientConn();
-    void CreateConnection(const char* ip, unsigned short port);
+    void createServer(const char* ip, unsigned short port);
+    void createConnection();
+    int reconnect();
 private:
     SOCKET ClientConn;
 
     int tryServerBinding();
     int tryListening();
-    int ConnectToClient();
+    int connectToClient();
 };
