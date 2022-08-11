@@ -32,7 +32,7 @@ public:
     mutable mutex mtx;
     condition_variable fileReadyCondition;
 
-    void writeInBuffer(const string& text, size_t inputLength);
+    void writeInBuffer(string text, size_t inputLength);
     string readFromBuffer();
 };
 

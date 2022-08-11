@@ -17,15 +17,20 @@ int main()
     th2_getSum.join();
 
     return 0;
-
 }
 
 // Реализация методов класса Buffer и пользовательских функций
 
-void Buffer::writeInBuffer(const string& text, size_t inputLength) {
+void Buffer::writeInBuffer(string text, size_t inputLength) {
 
     //lock_guard<mutex> lock(mtx); // До конца выполнения функции доступ к переменной isReady имеет только первый поток
-    unique_lock<mutex> lock(mtx);
+    if (text != "exit") {
+        unique_lock<mutex> lock(mtx);
+    }
+    else {
+        text = "";
+        inputLength = text.size();
+    }
 
     inBuffer.open(fileName, std::ios::out);
     for (unsigned i = 0; i < inputLength; ++i) {
@@ -55,7 +60,6 @@ string Buffer::readFromBuffer() {
 // Точка входа потока №2
 void postSumOfIntegersFromStr(Buffer& buffer, ClientPart& server) {
     while (true) {
-        cout << "Thread 2" << endl;
         unique_lock<mutex> lock(buffer.mtx);
         if (!buffer.isReady)
             buffer.fileReadyCondition.wait(lock);
@@ -64,8 +68,7 @@ void postSumOfIntegersFromStr(Buffer& buffer, ClientPart& server) {
 
         string strLine = buffer.readFromBuffer();
 
-        if (strLine == "exit") {
-            buffer.writeInBuffer("", 0);
+        if (strLine == "") {
             break;
         }
 
@@ -92,7 +95,6 @@ void postSumOfIntegersFromStr(Buffer& buffer, ClientPart& server) {
 void readAndPrecessInput(Buffer& buffer, istream& in) {
 
     while (true) {
-        cout << "Thread 1" << endl;
         char arrayOfInputSymbols[MAX_INPUT_SIZE + 1];
         size_t inputLength = readInputAndGetAmount(in, arrayOfInputSymbols);
 
