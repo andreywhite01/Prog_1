@@ -21,23 +21,30 @@ class ClientServer {
 public:
     ClientServer();
     ~ClientServer();
+    void setConnectionStatus(bool status);
+    bool getConnectionStatus();
 protected:
     int err = 0;
+    const char* ip = "";
+    unsigned short port = 0;
     WSADATA wsaData;
     ADDRESS_FAMILY iFamily = AF_INET;
     SOCKADDR_IN servInfo;
     SOCKET Sock;
+    bool isConnected = false;
 
     int tryWSAStartup();
     int setServInfo(const char* ip, unsigned short port);
     int tryInitializeSocket();
+    virtual void reconnect() = 0;
 };
 
 class ClientPart :public ClientServer {
 public:
     ClientPart() : ClientServer() {};
     int connectToServer(const char* ip, unsigned short port);
-    void post(const vector<char>& buf);
+    short post(const vector<char>& buf);
+    void reconnect();
 private:
     int tryConnectToServer();
 };
@@ -49,7 +56,7 @@ public:
     SOCKET getClientConn();
     void createServer(const char* ip, unsigned short port);
     void createConnection();
-    int reconnect();
+    void reconnect();
 private:
     SOCKET ClientConn;
 

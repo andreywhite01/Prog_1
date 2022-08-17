@@ -3,15 +3,13 @@
 int main()
 {
     ClientPart server;
+
     int err = server.connectToServer("127.0.0.1", 8080);
-
-    if (err != 0)
-        return 1;
-
+    cout << "\t\tConnection successfully established." << endl;
     Buffer accessingFile;
 
     thread th1_getReadAndPrecess(readAndPrecessInput, ref(accessingFile), ref(cin));
-    thread th2_getSum(postSumOfIntegersFromStr, ref(accessingFile), ref(server));
+    thread th2_getSum(postSumOfIntegersFromString, ref(accessingFile), ref(server));
 
     th1_getReadAndPrecess.join();
     th2_getSum.join();
@@ -24,13 +22,8 @@ int main()
 void Buffer::writeInBuffer(string text, size_t inputLength) {
 
     //lock_guard<mutex> lock(mtx); // До конца выполнения функции доступ к переменной isReady имеет только первый поток
-    if (text != "exit") {
-        unique_lock<mutex> lock(mtx);
-    }
-    else {
-        text = "";
-        inputLength = text.size();
-    }
+
+    unique_lock<mutex> lock(mtx);
 
     inBuffer.open(fileName, std::ios::out);
     for (unsigned i = 0; i < inputLength; ++i) {
@@ -40,11 +33,10 @@ void Buffer::writeInBuffer(string text, size_t inputLength) {
 
     isReady = true;
     fileReadyCondition.notify_all();
+
 }
 string Buffer::readFromBuffer() {
     string inputText = "";
-
-    //lock_guard<mutex> lock(mtx); // До конца выполнения функции доступ к переменной isReady имеет только второй поток
 
     fromBuffer.open(fileName, std::ios::in);
     fromBuffer >> inputText;
@@ -61,36 +53,41 @@ void Buffer::deleteBuffer() {
 }
 
 // Точка входа потока №2
-void postSumOfIntegersFromStr(Buffer& buffer, ClientPart& server) {
+void postSumOfIntegersFromString(Buffer& buffer, ClientPart& server) {
     while (true) {
-        unique_lock<mutex> lock(buffer.mtx);
-        if (!buffer.isReady)
-            buffer.fileReadyCondition.wait(lock);
 
-
-
-        string strLine = buffer.readFromBuffer();
-
-        if (strLine == "") {
-            break;
+        string strLine = "";
+        {
+            unique_lock<mutex> lock(buffer.mtx);
+            if (!buffer.isReady)
+                buffer.fileReadyCondition.wait(lock);
+            strLine = buffer.readFromBuffer();
         }
 
-        string::iterator it = strLine.begin();
-
-        int sum = isIntegerInChar(*it) ? C_INT(*it) : 0;
-
-        while (++it != strLine.end()) {
-            if (isIntegerInChar(*it))
-                sum += C_INT(*it);
+        // Проверяем соединение с сервером, 
+        // если соединение отсутствует, то пробуем переподключиться
+        server.post({ TEST_MESSAGE });
+        if (server.getConnectionStatus() == false) {
+            cout << "\n\t\tConnection lost.\n\t\tLast value was not transferred to programm 2.\n\t\tTrying to reconnect..." << endl;
+            server.reconnect();
+            cout << "\n\t\tConnection restored" << endl;
+            buffer.deleteBuffer();
+            buffer.isReady = false;
+            continue;
         }
         cout << "Transformed array: " << strLine << endl;
 
-        stringstream ss;
-        ss << to_string(sum);
         vector <char> buf(BUFF_SIZE);
-        ss.read(buf.data(), buf.size());
 
-        server.post(buf);
+        if (strLine != EXIT_COMMAND) {
+            int sum = getSumOfIntegersFromString(strLine);
+
+            stringstream ss;
+            ss << to_string(sum);
+            ss.read(buf.data(), buf.size());
+        }
+        if (server.getConnectionStatus() == true)
+            server.post(buf);
     }
 }
 
@@ -102,32 +99,35 @@ void readAndPrecessInput(Buffer& buffer, istream& in) {
         size_t inputLength = readInputAndGetAmount(in, arrayOfInputSymbols);
 
         if (isExitCommand(arrayOfInputSymbols)) {
-            buffer.writeInBuffer("exit", 4);
+            buffer.writeInBuffer(EXIT_COMMAND, 4);
             break;
         }
 
-        if (inputLength == 0) {
-            cerr << "Expected non empty input." << endl;
-            continue;
+        if (isInputLineInCorrectFormat(arrayOfInputSymbols, inputLength)) {
+            qsort(arrayOfInputSymbols, inputLength, sizeof(char),
+                [](const void* x1, const void* x2) {return (*(char*)x2 - *(char*)x1); });
+
+            string resultLine = replaceEvensToKB(arrayOfInputSymbols, inputLength);
+            size_t resultLength = resultLine.length();
+            buffer.writeInBuffer(resultLine, resultLength);
         }
-
-        if (inputLength > MAX_INPUT_SIZE) {
-            cerr << "Input length is more then " << MAX_INPUT_SIZE << " symbols. Try again." << endl;
-            continue;
-        }
-
-        if (!areIntegersInChars(arrayOfInputSymbols, inputLength)) {
-            cerr << "There are not only integers in input. Try again." << endl;
-            continue;
-        }
-
-        qsort(arrayOfInputSymbols, inputLength, sizeof(char),
-            [](const void* x1, const void* x2) {return (*(char*)x2 - *(char*)x1); });
-
-        string resultLine = replaceEvensToKB(arrayOfInputSymbols, inputLength);
-        size_t resultLength = resultLine.length();
-        buffer.writeInBuffer(resultLine, resultLength);
     }
+}
+
+bool isInputLineInCorrectFormat(const char* arrayOfInputSymbols, size_t inputLength) {
+    if (inputLength == 0) {
+        cout << "Expected non empty input." << endl;
+        return false;
+    }
+    if (inputLength > MAX_INPUT_SIZE) {
+        cout << "Input length is more then " << MAX_INPUT_SIZE << " symbols. Try again." << endl;
+        return false;
+    }
+    if (!areIntegersInChars(arrayOfInputSymbols, inputLength)) {
+        cout << "There are not only integers in input. Try again." << endl;
+        return false;
+    }
+    return true;
 }
 
 string replaceEvensToKB(const char* arr, size_t arrLength) {
@@ -147,7 +147,7 @@ unsigned readInputAndGetAmount(istream& in, char* buffer) {
     unsigned index = 0;
     char symbol;
     while (in.get(symbol) && symbol != '\0' && symbol != '\n' && symbol != cin.eof()) {
-        writeSymbolInBuffer(symbol, index, buffer);
+        writeSymbolInBufferIndex(symbol, index, buffer);
         index++;
         if (index == MAX_INPUT_SIZE + 1) {
             in.ignore(INT_MAX, '\n');
@@ -158,7 +158,7 @@ unsigned readInputAndGetAmount(istream& in, char* buffer) {
     return index;
 }
 
-void writeSymbolInBuffer(char symbol, unsigned index, char* buffer) {
+void writeSymbolInBufferIndex(char symbol, unsigned index, char* buffer) {
 
     buffer[index] = symbol;
     buffer[index + 1] = '\0';
@@ -184,4 +184,16 @@ bool isExitCommand(const char* command) {
         return true;
     }
     return false;
+}
+
+int getSumOfIntegersFromString(string strLine) {
+    string::iterator it = strLine.begin();
+
+    int sum = isIntegerInChar(*it) ? C_INT(*it) : 0;
+
+    while (++it != strLine.end()) {
+        if (isIntegerInChar(*it))
+            sum += C_INT(*it);
+    }
+    return sum;
 }

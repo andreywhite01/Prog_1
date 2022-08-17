@@ -17,6 +17,7 @@
 #define MAX_INPUT_SIZE 64
 #define C_INT(x) ((int)((x) - '0'))
 #define EXIT_COMMAND "exit"
+#define TEST_MESSAGE 'k'
 
 using namespace std;
 
@@ -38,7 +39,7 @@ public:
 // Отправка на сервер результата работы второго потока,
 // то есть сумму целых чисел из буфера.
 // Точка входа второго потока
-void postSumOfIntegersFromStr(Buffer& buffer, ClientPart& server);
+void postSumOfIntegersFromString(Buffer& buffer, ClientPart& server);
 
 // Чтение данных, введенных пользователем,
 // обработка их в соответствии с заданием
@@ -51,5 +52,7 @@ bool isIntegerInChar(char symbol);
 bool areIntegersInChars(const char* arr, size_t arrLength);
 string replaceEvensToKB(const char* arr, size_t arrLength);
 unsigned readInputAndGetAmount(istream& in, char* buffer);
-void writeSymbolInBuffer(char symbol, unsigned index, char* buffer);
+void writeSymbolInBufferIndex(char symbol, unsigned index, char* buffer);
 bool isExitCommand(const char* command);
+int getSumOfIntegersFromString(string strLine);
+bool isInputLineInCorrectFormat(const char* arrayOfInputSymbols, size_t inputLength);

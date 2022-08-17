@@ -17,21 +17,18 @@ int ClientServer::tryWSAStartup() {
         cerr << WSAGetLastError();
         return 1;
     }
-    else
-        cerr << "WinSock initialization is OK" << endl;
     return 0;
 }
-int ClientServer::setServInfo(const char* ip, unsigned short port) {
+int ClientServer::setServInfo(const char* ip_, unsigned short port_) {
     ZeroMemory(&servInfo, sizeof(servInfo));
+    ip = ip_;
+    port = port_;
 
     in_addr ip_to_num;
     err = inet_pton(iFamily, ip, &ip_to_num);
     if (err <= 0) {
         cerr << "Error in IP translation to special numeric format" << endl;
         return 1;
-    }
-    else {
-        cerr << "IP translation to special numeric format is OK" << endl;
     }
 
     servInfo.sin_family = iFamily;
@@ -47,20 +44,41 @@ int ClientServer::tryInitializeSocket() {
         WSACleanup();
         return 1;
     }
-    else
-        cerr << "Client socket initialization is OK" << endl;
     return 0;
+}
+void ClientServer::setConnectionStatus(bool status) {
+    isConnected = status;
+}
+bool ClientServer::getConnectionStatus() {
+    return isConnected;
 }
 
 //Реализация методов класса, унаследованного от базового ClientPart
 
-int ClientPart::connectToServer(const char* ip, unsigned short port) {
+int ClientPart::connectToServer(const char* ip_, unsigned short port_) {
+    ip = ip_;
+    port = port_;
+
     setServInfo(ip, port);
     int err = tryConnectToServer();
 	return err;
 }
-void ClientPart::post(const vector <char>& buf) {
+short ClientPart::post(const vector <char>& buf) {
     short packet_size = send(Sock, buf.data(), (int)buf.size(), 0);
+
+    if (packet_size == SOCKET_ERROR) {
+        setConnectionStatus(false);
+    }
+    return packet_size;
+}
+void ClientPart::reconnect() {
+    int err = -1;
+    while (err != 0) {
+        closesocket(Sock);
+        Sock = socket(iFamily, SOCK_STREAM, 0);
+        err = connect(Sock, (sockaddr*)&servInfo, sizeof(servInfo));
+    }
+    setConnectionStatus(true);
 }
 
 int ClientPart::tryConnectToServer() {
@@ -68,12 +86,10 @@ int ClientPart::tryConnectToServer() {
 
     if (err != 0) {
         cerr << "Connection to Server is FAILED. Error # " << WSAGetLastError() << endl;
-        closesocket(Sock);
-        WSACleanup();
-        return 1;
+        return err;
     }
-    else
-        cerr << "Connection established SUCCESSFULLY. Ready to send a message to Server" << endl;
+
+    setConnectionStatus(true);
     return 0;
 }
 
@@ -87,21 +103,11 @@ void ServerPart::createConnection() {
     tryListening();
     connectToClient();
 }
-int ServerPart::reconnect() {
+void ServerPart::reconnect() {
     sockaddr_in clientInfo;
     ZeroMemory(&clientInfo, sizeof(clientInfo));
     int clientInfo_size = sizeof(clientInfo);
     ClientConn = accept(Sock, (sockaddr*)&clientInfo, &clientInfo_size);
-    if (ClientConn == INVALID_SOCKET) {
-        cerr << "Client detected, but can't connect to a client. Error # " << WSAGetLastError() << endl;
-        closesocket(Sock);
-        closesocket(ClientConn);
-        WSACleanup();
-        return 1;
-    }
-    else
-        cerr << "Reconncetion to a client established successfully" << endl;
-    return 0;
 }
 SOCKET ServerPart::getServSock() {
     return Sock;
@@ -119,8 +125,6 @@ int ServerPart::tryServerBinding() {
         WSACleanup();
         return 1;
     }
-    else
-        cerr << "Binding socket to Server info is OK" << endl;
     return 0;
 }
 int ServerPart::tryListening() {
@@ -132,9 +136,6 @@ int ServerPart::tryListening() {
         closesocket(Sock);
         WSACleanup();
         return 1;
-    }
-    else {
-        cerr << "Listening..." << endl;
     }
     return 0;
 }
@@ -154,7 +155,5 @@ int ServerPart::connectToClient() {
         WSACleanup();
         return 1;
     }
-    else
-        cerr << "Connection to a client established successfully" << endl;
     return 0;
 }
